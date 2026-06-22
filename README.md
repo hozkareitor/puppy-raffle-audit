@@ -1,127 +1,105 @@
-# First Flight #2: Puppy Raffle
+# Puppy Raffle - Smart Contract Security Audit
 
-- [Contest Details](#contest-details)
-  - [Prize Pool](#prize-pool)
-  - [Stats](#stats)
-- [Puppy Raffle](#puppy-raffle)
-- [Getting Started](#getting-started)
-  - [Requirements](#requirements)
-  - [Quickstart](#quickstart)
-    - [Optional Gitpod](#optional-gitpod)
-- [Usage](#usage)
-  - [Testing](#testing)
-    - [Test Coverage](#test-coverage)
-- [Audit Scope Details](#audit-scope-details)
-  - [Compatibilities](#compatibilities)
-- [Roles](#roles)
-- [Known Issues](#known-issues)
+**Auditor:** [@hozkareitor](https://github.com/hozkareitor)  
+**Date:** June 2026  
+**Methodology:** Patrick Collins - 8 Phases  
+**Platform:** CodeHawks First Flight #2  
+**Original Contest:** October 2023
 
-# Contest Details
+---
 
-### Prize Pool
+## Executive Summary
 
-- High - 100xp
-- Medium - 20xp
-- Low - 2xp
+Comprehensive security audit of the **PuppyRaffle** smart contract, a raffle protocol where participants send ETH to enter a drawing for a randomly generated puppy NFT.
 
-- Starts: Noon UTC Wednesday, Oct 25 2023
-- Ends: Noon UTC Wednesday, Nov 01 2023
+| Metric | Value |
+|--------|-------|
+| nSLOC | 143 |
+| Complexity Score | 111 |
+| Solidity Version | 0.7.6 |
+| Deployment Chain | Ethereum |
+| Test Coverage | 84% lines |
 
-## Stats
+---
 
-- nSLOC: 143
-- Complexity Score: 111
+## Repository Structure
 
-[//]: # (contest-details-open)
+.
+├── README.md ← Audit portfolio overview
+├── audit/ ← Audit documentation by phase
+│ ├── phase1-scoping/ ← Scope definition & protocol understanding
+│ ├── phase2-recon/ ← Architecture & flow diagrams
+│ ├── phase3-tools/ ← Slither, Aderyn, Forge coverage
+│ ├── phase4-vulnerabilities/ ← Vulnerability identification
+│ ├── phase5-exploits/ ← Proof of Code
+│ ├── phase6-report/ ← Final audit report
+│ ├── phase7-remediation/ ← Fix recommendations
+│ └── phase8-delivery/ ← Final delivery package
+├── src/ ← Original audited code
+│ └── PuppyRaffle.sol
+├── test/ ← Original test suite
+│ └── PuppyRaffleTest.t.sol
+└── foundry.toml
+text
 
-# Puppy Raffle
 
-This project is to enter a raffle to win a cute dog NFT. The protocol should do the following:
+---
 
-1. Call the `enterRaffle` function with the following parameters:
-   1. `address[] participants`: A list of addresses that enter. You can use this to enter yourself multiple times, or yourself and a group of your friends.
-2. Duplicate addresses are not allowed
-3. Users are allowed to get a refund of their ticket & `value` if they call the `refund` function
-4. Every X seconds, the raffle will be able to draw a winner and be minted a random puppy
-5. The owner of the protocol will set a feeAddress to take a cut of the `value`, and the rest of the funds will be sent to the winner of the puppy.
+## Audit Methodology
 
-## Roles
+Security audit based on **Patrick Collins' 8-phase methodology**:
 
-Owner - Deployer of the protocol, has the power to change the wallet address to which fees are sent through the `changeFeeAddress` function.
-Player - Participant of the raffle, has the power to enter the raffle with the `enterRaffle` function and refund value through `refund` function.
+| Phase | Objective | Status |
+|-------|-----------|--------|
+| **1. Scoping** | Understand WHAT is being audited | ✅ Complete |
+| **2. Recon** | Understand HOW the protocol works | ✅ Complete |
+| **3. Tools** | Automated analysis (Slither, Aderyn) | ✅ Complete |
+| **4. Vulnerabilities** | Manual vulnerability identification | 🔄 In Progress |
+| **5. Exploits** | Proof of Code development | ⬜ Pending |
+| **6. Report** | Professional audit report | ⬜ Pending |
+| **7. Remediation** | Fix recommendations | ⬜ Pending |
+| **8. Delivery** | Final delivery | ⬜ Pending |
 
-[//]: # (contest-details-close)
+---
 
-[//]: # (getting-started-open)
+## Quick Start
 
-# Getting Started
+```bash
+# Clone the repository
+git clone https://github.com/hozkareitor/puppy-raffle-audit.git
+cd puppy-raffle-audit
 
-## Requirements
+# Install dependencies
+forge install
 
-- [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-  - You'll know you did it right if you can run `git --version` and you see a response like `git version x.x.x`
-- [foundry](https://getfoundry.sh/)
-  - You'll know you did it right if you can run `forge --version` and you see a response like `forge 0.2.0 (816e00b 2023-03-16T00:05:26.396218Z)`
+# Run original tests
+forge test -vvv
 
-## Quickstart
-
-```
-git clone https://github.com/Cyfrin/2023-10-Puppy-Raffle
-cd 2023-10-Puppy-Raffle
-make
-```
-
-### Optional Gitpod
-
-If you can't or don't want to run and install locally, you can work with this repo in Gitpod. If you do this, you can skip the `clone this repo` part.
-
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#github.com/Cyfrin/3-passwordstore-audit)
-
-# Usage
-
-## Testing
-
-```
-forge test
-```
-
-### Test Coverage
-
-```
+# Run coverage
 forge coverage
-```
 
-and for coverage based testing:
+# Run static analysis
+slither .
+aderyn .
 
-```
-forge coverage --report debug
-```
+📊 Preliminary Findings
+ID	Title	Severity	Status
+H-1	Weak PRNG in selectWinner()	🔴 HIGH	Confirmed
+H-2	Reentrancy in refund()	🔴 HIGH	Pending PoC
+H-3	DoS via strict equality in withdrawFees()	🔴 HIGH	Confirmed
+H-4	withdrawFees() has no access control	🔴 HIGH	Confirmed
+M-1	abi.encodePacked() collision risk	🟡 MEDIUM	Confirmed
+M-2	O(n²) DoS via gas exhaustion	🟡 MEDIUM	Confirmed
+L-1	Missing zero-address check on feeAddress	🟢 LOW	Confirmed
+L-2	_isActivePlayer() unused dead code	🟢 LOW	Confirmed
+L-3	State variables should be constant/immutable	🟢 LOW	Confirmed
 
-[//]: # (getting-started-close)
+Disclaimer
 
-[//]: # (scope-open)
+This audit was conducted for educational and portfolio purposes. It does not constitute a professional security audit for production deployment. The original code was created for the CodeHawks First Flight #2 contest in October 2023.
+Contact
 
-# Audit Scope Details
+    GitHub: @hozkareitor
 
-- Commit Hash: 22bbbb2c47f3f2b78c1b134590baf41383fd354f
-- In Scope:
-
-```
-./src/
-└── PuppyRaffle.sol
-```
-
-## Compatibilities
-
-- Solc Version: 0.7.6
-- Chain(s) to deploy contract to: Ethereum
-
-[//]: # (scope-close)
-
-[//]: # (known-issues-open)
-
-# Known Issues
-
-None
-
-[//]: # (known-issues-close)
+    Email: hozkareitor@gmail.com
+  
