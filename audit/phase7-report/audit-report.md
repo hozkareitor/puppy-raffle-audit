@@ -96,3 +96,81 @@ PuppyRaffleExploits.t.sol: testPoCDoSGasNestedLoop() - 100 players consume over 
 - [SWC-128: DoS with Block Gas Limit](https://swcregistry.io/docs/SWC-128)
 
 ---
+### [H-3] Winner Can Be address(0), Causing Permanent Loss of Funds and NFT
+
+**Severity:** High  
+**Location:** src/PuppyRaffle.sol:125-154
+
+**Description:**
+selectWinner() does not check whether the selected winner is address(0). If a player requests a refund before the winner is selected, their position in the array becomes address(0). If the "random" index points to that position, ETH and the NFT are sent to address(0), burning them forever.
+
+**Vulnerable Code:**
+```solidity
+address winner = players[winnerIndex];  // Can be address(0)
+// ...
+(bool success,) = winner.call{value: prizePool}("");
+_safeMint(winner, tokenId);
+```
+
+**Impact:**
+- Prize ETH is burned forever.
+- NFT is minted to address(0) and lost forever.
+- Legitimate players lose their money with no recovery possible.
+
+**Proof of Concept:**
+PuppyRaffleExploits.t.sol: testPoCWinnerIsAddressZero() demonstrates that selectWinner() reverts when attempting to send ETH to address(0).
+
+**Recommended Mitigation:**
+```diff
++ uint256 validPlayersCount;
++ for (uint256 i = 0; i < players.length; i++) {
++     if (players[i] != address(0)) {
++         validPlayersCount++;
++     }
++ }
+
+- uint256 totalAmountCollected = players.length * entranceFee;
++ uint256 totalAmountCollected = validPlayersCount * entranceFee;
+
+  // When selecting winner, ensure it is not address(0)
++ require(winner != address(0), "PuppyRaffle: Invalid winner");
+```
+
+---
+
+### [H-4] Incorrect Prize Calculation When Refunds Occur
+
+**Severity:** High  
+**Location:** src/PuppyRaffle.sol:131-133
+
+**Description:**
+selectWinner() calculates totalAmountCollected = players.length * entranceFee, assuming all players in the array paid the fee. However, if some players requested refunds, their positions are address(0) and the contract no longer holds their ETH. The contract attempts to pay out more ETH than it actually holds.
+
+**Vulnerable Code:**
+```solidity
+uint256 totalAmountCollected = players.length * entranceFee;
+uint256 prizePool = (totalAmountCollected * 80) / 100;
+uint256 fee = (totalAmountCollected * 20) / 100;
+```
+
+**Impact:**
+- selectWinner() reverts because the contract does not have enough ETH.
+- The legitimate winner cannot receive their prize.
+- The raffle is permanently locked.
+
+**Proof of Concept:**
+PuppyRaffleExploits.t.sol: testPoCPrizeCalculationBrokenByRefunds() demonstrates that with 4 players and 2 refunds, selectWinner() fails because it attempts to send 3.2 ETH when only 2 ETH exist.
+
+**Recommended Mitigation:**
+```diff
+- uint256 totalAmountCollected = players.length * entranceFee;
++ uint256 activePlayers;
++ for (uint256 i = 0; i < players.length; i++) {
++     if (players[i] != address(0)) {
++         activePlayers++;
++     }
++ }
++ uint256 totalAmountCollected = activePlayers * entranceFee;
+```
+
+---
