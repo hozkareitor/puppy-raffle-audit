@@ -174,3 +174,100 @@ PuppyRaffleExploits.t.sol: testPoCPrizeCalculationBrokenByRefunds() demonstrates
 ```
 
 ---
+### [H-5] withdrawFees() Has No Access Control
+
+**Severity:** High  
+**Location:** src/PuppyRaffle.sol:157
+
+**Description:**
+The withdrawFees() function is external with no access control modifier. Anyone can call it after a winner is selected. Although the funds go to feeAddress, this allows a malicious third party to force fee withdrawals at inopportune times.
+
+**Vulnerable Code:**
+```solidity
+function withdrawFees() external {  // Anyone can call this
+```
+
+**Impact:**
+- A malicious actor can force fee withdrawals immediately after selectWinner().
+- May interfere with protocol accounting.
+
+**Recommended Mitigation:**
+```diff
+- function withdrawFees() external {
++ function withdrawFees() external onlyOwner {
+```
+
+---
+
+### [H-6] Denial of Service on withdrawFees() via Strict Balance Equality
+
+**Severity:** High  
+**Location:** src/PuppyRaffle.sol:158
+
+**Description:**
+withdrawFees() uses strict equality (==) to compare the contract balance with totalFees. If anyone sends 1 wei to the contract via selfdestruct(), the balance will never again be exactly equal to totalFees, permanently locking the function.
+
+**Vulnerable Code:**
+```solidity
+require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active");
+```
+
+**Impact:**
+- Fees are permanently locked.
+- There is no way to recover the funds.
+- The attack costs only 1 wei.
+
+**Proof of Concept:**
+PuppyRaffleExploits.t.sol: testPoCDoSWithOneWei() demonstrates that after a selfdestruct with 1 wei, withdrawFees() permanently reverts.
+
+**Recommended Mitigation:**
+```diff
+- require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active");
++ require(address(this).balance >= uint256(totalFees), "PuppyRaffle: Insufficient balance for fees");
+```
+
+**References:**
+- [SWC-132: Unexpected Ether Balance](https://swcregistry.io/docs/SWC-132)
+- [Force-feeding ETH via selfdestruct](https://consensys.github.io/smart-contract-best-practices/attacks/force-feeding/)
+
+---
+
+### [H-7] Predictable and Manipulable Randomness in selectWinner()
+
+**Severity:** High  
+**Location:** src/PuppyRaffle.sol:128-129
+
+**Description:**
+The contract generates the winner index using keccak256 of predictable and manipulable values: msg.sender, block.timestamp, and block.difficulty. A miner can manipulate block.timestamp within a range, and an MEV bot can simulate the result before submitting a transaction.
+
+**Vulnerable Code:**
+```solidity
+uint256 winnerIndex =
+    uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty))) % players.length;
+```
+
+**Impact:**
+- A miner/validator can influence who wins.
+- An attacker can simulate the result and only execute if they win.
+- The "randomness" is not random at all.
+
+**Recommended Mitigation:**
+Use a verifiable randomness oracle such as Chainlink VRF:
+```solidity
+import {VRFConsumerBase} from "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+
+function requestRandomWinner() external {
+    requestRandomness(keyHash, fee);
+}
+
+function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
+    uint256 winnerIndex = randomness % players.length;
+    // ...
+}
+```
+
+**References:**
+- [Chainlink VRF Documentation](https://docs.chain.link/vrf)
+- [SWC-120: Weak Sources of Randomness](https://swcregistry.io/docs/SWC-120)
+
+---
