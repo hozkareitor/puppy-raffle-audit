@@ -271,3 +271,129 @@ function fulfillRandomness(bytes32 requestId, uint256 randomness) internal overr
 - [SWC-120: Weak Sources of Randomness](https://swcregistry.io/docs/SWC-120)
 
 ---
+## MEDIUM Severity Findings
+
+---
+
+### [M-1] Duplicate Check Can Be Bypassed Using refund()
+
+**Severity:** Medium  
+**Location:** src/PuppyRaffle.sol:86-91
+
+**Description:**
+When a player requests a refund, their position becomes address(0). The duplicate check does not consider address(0) as a duplicate of any real address. Therefore, a player can re-enter after a refund, appearing twice in the array.
+
+**Impact:**
+- A player can have multiple entries in the raffle.
+- This manipulates the odds in their favor.
+
+**Proof of Concept:**
+PuppyRaffleExploits.t.sol: testPoCBypassDuplicateCheck() demonstrates that Alice can appear twice in the array after refund + re-enter.
+
+**Recommended Mitigation:**
+Use a mapping to track active participants (see H-2).
+
+---
+
+### [M-2] getActivePlayerIndex() Returns 0 for Both "Not Found" and Index 0
+
+**Severity:** Medium  
+**Location:** src/PuppyRaffle.sol:110-117
+
+**Description:**
+The function returns 0 in two different cases: when the player is at index 0 and when the player is not in the array. This is ambiguous and can cause errors in contracts that depend on this function.
+
+**Recommended Mitigation:**
+```diff
+- function getActivePlayerIndex(address player) external view returns (uint256) {
++ function getActivePlayerIndex(address player) external view returns (int256) {
+      for (uint256 i = 0; i < players.length; i++) {
+          if (players[i] == player) {
+-             return i;
++             return int256(i);
+          }
+      }
+-     return 0;
++     return -1;
+  }
+```
+
+---
+
+## LOW Severity Findings
+
+---
+
+### [L-1] Missing Zero-Address Check on feeAddress
+
+**Severity:** Low  
+**Location:** src/PuppyRaffle.sol:62, 168
+
+**Description:**
+Neither the constructor nor changeFeeAddress() validates that the fee address is not address(0). If set to address(0), all fees will be burned.
+
+**Recommended Mitigation:**
+```diff
+  constructor(uint256 _entranceFee, address _feeAddress, uint256 _raffleDuration) {
++     require(_feeAddress != address(0), "PuppyRaffle: Invalid fee address");
+      // ...
+  }
+
+  function changeFeeAddress(address newFeeAddress) external onlyOwner {
++     require(newFeeAddress != address(0), "PuppyRaffle: Invalid fee address");
+      feeAddress = newFeeAddress;
+  }
+```
+
+---
+
+### [L-2] _isActivePlayer() Is Dead Code
+
+**Severity:** Low  
+**Location:** src/PuppyRaffle.sol:173-180
+
+**Description:**
+The _isActivePlayer() function is defined but never used anywhere in the contract. This wastes deployment gas and increases the attack surface.
+
+**Recommended Mitigation:**
+Remove the unused function.
+
+---
+
+### [L-3] State Variables Should Be constant or immutable
+
+**Severity:** Low  
+**Location:** src/PuppyRaffle.sol:24, 38, 43, 48
+
+**Description:**
+raffleDuration should be immutable, and the image URIs (commonImageUri, rareImageUri, legendaryImageUri) should be constant to save gas.
+
+**Recommended Mitigation:**
+```diff
+- uint256 public raffleDuration;
++ uint256 public immutable raffleDuration;
+
+- string private commonImageUri = "ipfs://...";
++ string private constant COMMON_IMAGE_URI = "ipfs://...";
+```
+
+---
+
+### [L-4] Events Missing indexed Parameters
+
+**Severity:** Low  
+**Location:** src/PuppyRaffle.sol:53-55
+
+**Description:**
+The RaffleRefunded and FeeAddressChanged events have address parameters without the indexed modifier, making them harder to search for off-chain tools.
+
+**Recommended Mitigation:**
+```diff
+- event RaffleRefunded(address player);
++ event RaffleRefunded(address indexed player);
+
+- event FeeAddressChanged(address newFeeAddress);
++ event FeeAddressChanged(address indexed newFeeAddress);
+```
+
+---
